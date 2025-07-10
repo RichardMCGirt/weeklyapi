@@ -64,7 +64,8 @@ function renderTable(data) {
   if (!headers.length) return;
   let html = '<table><thead>';
 
-
+  // Section header row
+  html += buildSectionHeaderRow(headers.filter(h => h !== "Data Source"));
 
   // Regular header row
   html += '<tr>';
