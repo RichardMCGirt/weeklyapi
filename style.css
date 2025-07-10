@@ -1,0 +1,88 @@
+    body {
+      background: #f7f8fa;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+
+    .section-header {
+  background: #e8eaf6;
+  font-weight: bold;
+  text-align: center;
+  border-bottom: 2px solid #3f51b5;
+}
+
+    .container {
+      max-width: 1100px;
+      margin: 40px auto;
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 6px 32px rgba(60,60,60,0.11);
+      padding: 32px 24px;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 24px;
+      color: #234;
+    }
+    .upload-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 30px;
+      gap: 10px;
+    }
+    .upload-section input[type="file"] {
+      padding: 8px 0;
+      font-size: 1.1em;
+    }
+    #search {
+      padding: 8px 18px;
+      border: 1px solid #d3d3d3;
+      border-radius: 6px;
+      width: 280px;
+      margin-bottom: 16px;
+      font-size: 1.08em;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 18px;
+      font-size: 1.08em;
+      background: #fff;
+    }
+    thead th {
+      background: #e9f2ff;
+      cursor: pointer;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      padding: 10px 8px;
+    }
+    /* Zebra striping for table rows */
+tbody tr.even {
+  background: #f7faff;
+}
+tbody tr.odd {
+  background: #fff;
+}
+
+    tbody td {
+      padding: 10px 8px;
+      border-bottom: 1px solid #f0f0f0;
+      text-align: left;
+    }
+    tbody tr:hover {
+      background: #f7faff;
+      transition: background 0.16s;
+    }
+    .sortable::after {
+      content: ' ⇅';
+      font-size: 0.95em;
+      color: #88a;
+    }
+    @media (max-width: 700px) {
+      .container { padding: 12px 4px; }
+      th, td { font-size: 0.97em; padding: 8px 2px; }
+      #search { width: 98%; }
+    }

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Weekly Goals Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <!-- Modern styling with simple CSS (custom or add Bootstrap/Tailwind if you want) -->
+    <link rel="stylesheet" href="style.css">
+
+</head>
+<body>
+  <div class="container">
+    <h1>Weekly Goals Dashboard</h1>
+    <div class="upload-section">
+  <label for="csvFile"><b>Upload Weekly Goals CSV:</b></label>
+  <input type="file" id="csvFile" accept=".csv" />
+</div>
+<div id="table-container"></div>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>
