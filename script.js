@@ -88,8 +88,6 @@ function renderTable(data) {
   document.getElementById('table-container').innerHTML = html;
 }
 
-
-
 function saveToLocalStorage() {
   const obj = { headers, globalData };
   localStorage.setItem("weeklyGoalsTable", JSON.stringify(obj));
