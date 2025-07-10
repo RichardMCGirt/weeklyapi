@@ -65,20 +65,18 @@ function renderTable(data) {
   let html = '<table><thead>';
 
   // Section header row
-  html += buildSectionHeaderRow(headers.filter(h => h !== "Data Source"));
+  html += buildSectionHeaderRow(headers);
 
   // Regular header row
   html += '<tr>';
   headers.forEach((header, i) => {
-    if (header === "Data Source") return; // skip
-    html += `<th>${header}</th>`;
+    html += `<th (${i})">${header}</th>`;
   });
   html += '</tr></thead><tbody>';
 
   data.forEach((row, rIdx) => {
     html += `<tr class="${rIdx % 2 === 0 ? 'even' : 'odd'}">`;
     headers.forEach((header, i) => {
-      if (header === "Data Source") return; // skip
       let val = row[i];
       // Hide cell if value is "Omnna" or "Airtable" or "Mgmt"
       if (val === "Omnna" || val === "Airtable" || val === "Mgmt") val = "";
@@ -89,7 +87,6 @@ function renderTable(data) {
   html += '</tbody></table>';
   document.getElementById('table-container').innerHTML = html;
 }
-
 
 
 
