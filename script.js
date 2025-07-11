@@ -110,8 +110,11 @@ async function getEstimatedSumsByTypeAndDate(dateHeaders) {
   const records1 = await fetchAllAirtableRecords1(); // Old table
   const records2 = await fetchAllAirtableRecords2(); // New table
 
-  let residentialSums = {}, commercialSums = {};
+  // Define these ONCE at the top:
+  let residentialSums1 = {}, commercialSums1 = {};
+  let residentialSums2 = {}, commercialSums2 = {};
 
+  // ------- First Airtable (existing logic) -------
   for (const date of dateHeaders) {
     let sumResidential = 0, sumCommercial = 0;
     let [mm, dd] = date.split('/');
@@ -119,7 +122,6 @@ async function getEstimatedSumsByTypeAndDate(dateHeaders) {
     let headerDate = new Date(year, parseInt(mm, 10) - 1, parseInt(dd, 10));
     headerDate.setHours(0,0,0,0);
 
-    // ------- First Airtable (existing logic) -------
     for (const rec of records1) {
       if (!rec['Last Time Outcome Modified']) continue;
       let dateObj = new Date(rec['Last Time Outcome Modified']);
@@ -145,55 +147,82 @@ async function getEstimatedSumsByTypeAndDate(dateHeaders) {
         sumResidential += val;
       }
     }
-
-    // ------- Second Airtable (new logic) -------
-   for (const rec of records2) {
-  if (!rec['Date Marked Completed']) {
-    console.log('[Airtable2][SKIP] Missing Date Marked Completed:', rec);
-    continue;
-  }
-  let dateObj = new Date(rec['Date Marked Completed']);
-  dateObj.setHours(0,0,0,0);
-
-  let diffDays = (headerDate - dateObj) / (1000 * 60 * 60 * 24);
-  if (dateObj > headerDate || diffDays < 0 || diffDays > 8) {
-    console.log(`[Airtable2][SKIP] Out of date range. Header: ${headerDate.toLocaleDateString()}, Record: ${dateObj.toLocaleDateString()}, diffDays: ${diffDays}`, rec);
-    continue;
+    residentialSums1[date] = sumResidential || "";
+    commercialSums1[date] = sumCommercial || "";
   }
 
-  let projectTypeField = rec['Project Type'];
-  let projectType = "";
-  if (typeof projectTypeField === 'string') {
-    projectType = projectTypeField.trim().toLowerCase();
-  } else if (Array.isArray(projectTypeField) && projectTypeField.length > 0) {
-    projectType = String(projectTypeField[0]).trim().toLowerCase();
+  // ------- Second Airtable (new logic) -------
+ for (const date of dateHeaders) {
+  let sumResidential = 0, sumCommercial = 0;
+  let [mm, dd] = date.split('/');
+  let year = new Date().getFullYear();
+  let headerDate = new Date(year, parseInt(mm, 10) - 1, parseInt(dd, 10));
+  headerDate.setHours(0,0,0,0);
+
+  console.log(`[Airtable2][SUM] === Calculating for header date: ${headerDate.toLocaleDateString()} (${date}) ===`);
+
+  for (const rec of records2) {
+    // Show all relevant fields for this record
+    console.log('[Airtable2][CHECK] Bid $:', rec['Bid $'], '| Date Marked Completed:', rec['Date Marked Completed'], '| Project Type:', rec['Project Type']);
+
+    if (
+      rec['Bid $'] === undefined ||
+      rec['Bid $'] === null ||
+      String(rec['Bid $']).trim() === "" ||
+      !rec['Date Marked Completed']
+    ) {
+      console.log('[Airtable2][SKIP] Missing Bid $ or Date Marked Completed.', rec);
+      continue;
+    }
+
+    let dateObj = new Date(rec['Date Marked Completed']);
+    dateObj.setHours(0,0,0,0);
+    let diffDays = (headerDate - dateObj) / (1000 * 60 * 60 * 24);
+
+    if (dateObj > headerDate || diffDays < 0 || diffDays > 8) {
+      console.log(`[Airtable2][SKIP] Record outside date window (diffDays: ${diffDays}).`, rec);
+      continue;
+    }
+
+    let projectTypeField = rec['Project Type'];
+    let projectType = "";
+    if (typeof projectTypeField === 'string') {
+      projectType = projectTypeField.trim().toLowerCase();
+    } else if (Array.isArray(projectTypeField) && projectTypeField.length > 0) {
+      projectType = String(projectTypeField[0]).trim().toLowerCase();
+    }
+    let val = parseFloat(String(rec['Bid $'] || "0").replace(/[^0-9.\-]/g,""));
+
+    if (projectType === 'commercial') {
+      sumCommercial += val;
+      console.log(`[Airtable2][COMMERCIAL] Adding $${val} to sumCommercial. New total: $${sumCommercial}`);
+    } else if (projectType) {
+      sumResidential += val;
+      console.log(`[Airtable2][RESIDENTIAL] Adding $${val} to sumResidential. New total: $${sumResidential}`);
+    } else {
+      console.log(`[Airtable2][SKIP] Unknown or blank projectType for record.`, rec);
+    }
   }
 
-  let val = parseFloat(String(rec['Bid Value'] || "0").replace(/[^0-9.\-]/g,""));
+  console.log(`[Airtable2][RESULT] For ${date}: Residential=$${sumResidential}, Commercial=$${sumCommercial}`);
 
-  if (projectType === 'commercial') {
-    sumCommercial += val;
-    console.log(`[Airtable2][COMMERCIAL] +$${val} (Total: $${sumCommercial}) for date ${date} | Bid Value: ${rec['Bid Value']}`, rec);
-  } else if (projectType) {
-    sumResidential += val;
-    console.log(`[Airtable2][RESIDENTIAL] +$${val} (Total: $${sumResidential}) for date ${date} | Bid Value: ${rec['Bid Value']}`, rec);
-  } else {
-    console.log(`[Airtable2][SKIP] Unknown Project Type:`, rec);
-  }
+  residentialSums2[date] = sumResidential || "";
+  commercialSums2[date] = sumCommercial || "";
 }
 
-console.log(`[Airtable2][RESULTS] For date ${date} => Residential: $${sumResidential}, Commercial: $${sumCommercial}`);
 
-
-    residentialSums[date] = sumResidential || "";
-    commercialSums[date] = sumCommercial || "";
-  }
-
+  // ---- Return whichever mapping you want to rows ----
   return {
-    "$ Residential Estimated": residentialSums,
-    "$ Commercial Estimated": commercialSums
+    // For old Airtable (example row names)
+    "Sales - Residential": residentialSums1,
+    "Sales - Commercial": commercialSums1,
+
+    // For new Airtable (for these row names)
+    "$ Residential Estimated": residentialSums2,
+    "$ Commercial Estimated": commercialSums2
   };
 }
+
 
 
 async function fetchAirtableRowValues(measurable, dateHeaders) {
@@ -260,31 +289,21 @@ async function fetchAllAirtableRecords2() {
     offset = json.offset;
   } while (offset);
 
-  // ----- FILTER SECTION -----
+  // Remove all filtering, just return every record's fields:
+  const result = allRecords.map(r => r.fields);
 
-  const filtered = allRecords
-    .map(r => r.fields)
-    .filter(fields => {
-      // Check Bid $ (not undefined, null, or empty string)
-      const bidValue = fields["Bid $"];
-      if (bidValue === undefined || bidValue === null || String(bidValue).trim() === "") {
-        console.log("[Airtable2][FILTER] Skipping: Bid $ empty", fields);
-        return false;
-      }
-    
-    });
-
-  console.log(`[Airtable2] Total records fetched: ${allRecords.length}, filtered: ${filtered.length}`);
-  if (filtered.length > 0) {
+  console.log(`[Airtable2] Total records fetched: ${result.length}`);
+  if (result.length > 0) {
     // Preview first 2 records for debugging
-    console.log('[Airtable2] Example filtered record:', filtered[0]);
-    if (filtered.length > 1) {
-      console.log('[Airtable2] Second filtered record:', filtered[1]);
+    console.log('[Airtable2] Example record:', result[0]);
+    if (result.length > 1) {
+      console.log('[Airtable2] Second record:', result[1]);
     }
   }
 
-  return filtered;
+  return result;
 }
+
 
 
 
@@ -317,8 +336,7 @@ let measurable = (measurableColIdx >= 0 ? row[measurableColIdx] : "");
 
 // Remap for display/logic
 let measurableKey = measurable;
-if (measurable === "Sales - Residential") measurableKey = "$ Residential Estimated";
-if (measurable === "Sales - Commercial") measurableKey = "$ Commercial Estimated";
+
     html += `<tr class="${rIdx % 2 === 0 ? 'even' : 'odd'}">`;
     visibleIndexes.forEach(i => {
       let val = row[i];
