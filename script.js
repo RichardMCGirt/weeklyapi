@@ -60,25 +60,55 @@ function parseCSV(csv, delimiter = ',') {
   return rows;
 }
 
+function isFutureDateHeader(header) {
+  // Try MM/DD and MM/DD/YYYY
+  const today = new Date();
+  // MM/DD
+  let match = /^(\d{2})\/(\d{2})$/.exec(header);
+  if (match) {
+    let year = today.getFullYear();
+    let date = new Date(year, parseInt(match[1],10)-1, parseInt(match[2],10));
+    // If that date has already passed this year, assume it's for *next* year
+    if (date < today.setHours(0,0,0,0)) return false;
+    return date > new Date(today.setHours(0,0,0,0));
+  }
+  // MM/DD/YYYY
+  match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(header);
+  if (match) {
+    let date = new Date(match[3], parseInt(match[1],10)-1, parseInt(match[2],10));
+    return date > new Date(today.setHours(0,0,0,0));
+  }
+  return false;
+}
+
+// --- REPLACE renderTable with the following: ---
 function renderTable(data) {
   if (!headers.length) return;
+
+  // Compute visible columns: not future date headers
+  let visibleIndexes = [];
+  headers.forEach((header, idx) => {
+    if (!isFutureDateHeader(header)) visibleIndexes.push(idx);
+  });
+
   let html = '<table><thead>';
 
-  // Section header row
-  html += buildSectionHeaderRow(headers);
+  // Section header row, filtered
+  html += buildSectionHeaderRow(visibleIndexes.map(i => headers[i]));
 
-  // Regular header row
+  // Regular header row (with "Data Source" blanked out)
   html += '<tr>';
-  headers.forEach((header, i) => {
-    html += `<th (${i})">${header}</th>`;
+  visibleIndexes.forEach(i => {
+    let label = headers[i] === "Data Source" ? "" : headers[i];
+    html += `<th>${label}</th>`;
   });
   html += '</tr></thead><tbody>';
 
+  // Data rows
   data.forEach((row, rIdx) => {
     html += `<tr class="${rIdx % 2 === 0 ? 'even' : 'odd'}">`;
-    headers.forEach((header, i) => {
+    visibleIndexes.forEach(i => {
       let val = row[i];
-      // Hide cell if value is "Omnna" or "Airtable" or "Mgmt"
       if (val === "Omnna" || val === "Airtable" || val === "Mgmt") val = "";
       html += `<td>${val ?? ""}</td>`;
     });
@@ -87,6 +117,8 @@ function renderTable(data) {
   html += '</tbody></table>';
   document.getElementById('table-container').innerHTML = html;
 }
+
+
 
 function saveToLocalStorage() {
   const obj = { headers, globalData };
