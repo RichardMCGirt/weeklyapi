@@ -1,88 +1,103 @@
-    body {
-      background: #f7f8fa;
-      font-family: 'Segoe UI', Arial, sans-serif;
-      margin: 0;
-      padding: 0;
-    }
-
-    .section-header {
-  background: #e8eaf6;
-  font-weight: bold;
+.container {
+  max-width: 2500px;
+  margin: 30px auto;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 6px 32px rgba(60,60,60,0.11);
+  padding: 32px 24px;
+  overflow-x: auto;
+}
+h1 {
   text-align: center;
-  border-bottom: 2px solid #3f51b5;
+  margin-bottom: 24px;
+  color: #234;
+  font-size: 2.1em;    /* Make it a bit bigger, optional */
+  font-weight: bold;    /* Bold for emphasis, optional */
+  display: block;       /* Ensures block display */
+  width: 100%;          /* Full width for centering */
+}
+.upload-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;     /* Center children horizontally */
+  justify-content: center; /* Center children vertically if you ever add height */
+  text-align: center;      /* Center label/input text, just in case */
+  margin-bottom: 30px;
+  gap: 10px;
 }
 
-    .container {
-      max-width: 1100px;
-      margin: 40px auto;
-      background: #fff;
-      border-radius: 16px;
-      box-shadow: 0 6px 32px rgba(60,60,60,0.11);
-      padding: 32px 24px;
-    }
-    h1 {
-      text-align: center;
-      margin-bottom: 24px;
-      color: #234;
-    }
-    .upload-section {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      margin-bottom: 30px;
-      gap: 10px;
-    }
-    .upload-section input[type="file"] {
-      padding: 8px 0;
-      font-size: 1.1em;
-    }
-    #search {
-      padding: 8px 18px;
-      border: 1px solid #d3d3d3;
-      border-radius: 6px;
-      width: 280px;
-      margin-bottom: 16px;
-      font-size: 1.08em;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 18px;
-      font-size: 1.08em;
-      background: #fff;
-    }
-    thead th {
-      background: #e9f2ff;
-      cursor: pointer;
-      position: sticky;
-      top: 0;
-      z-index: 2;
-      padding: 10px 8px;
-    }
-    /* Zebra striping for table rows */
+table {
+  width: 95%;              /* Not full width */
+  margin: 32px auto 0 auto; /* Center the table and add top margin */
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 1.08em;
+  background: #fff;
+  table-layout: fixed;
+  min-width: 800px;
+  box-shadow: 0 2px 12px rgba(60,60,60,0.07);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+thead th, tbody td {
+  padding: 20px 18px;      /* Extra padding for a softer look */
+  box-sizing: border-box;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+.section-header {
+  background: #e8eaf6;
+  font-weight: bold;
+  font-size: 1.35em;
+  text-align: center;
+  border-bottom: 2px solid #3f51b5;
+  padding-top: 16px;
+  padding-bottom: 16px;
+}
+
+thead th {
+  background: #e9f2ff;
+  border-bottom: 2px solid #3f51b5;
+  font-weight: bold;
+  font-size: 1.20em;      /* <-- Larger font size */
+  letter-spacing: 0.01em; /* Optional: subtle spacing */
+  padding: 22px 18px;     /* Slightly more padding for prominence */
+  color: #223356;         /* Optional: a bit darker text */
+}
+
+
 tbody tr.even {
   background: #f7faff;
 }
 tbody tr.odd {
   background: #fff;
 }
+tbody td {
+  border-bottom: 1px solid #e0e0e0;
+  vertical-align: middle;
+}
 
-    tbody td {
-      padding: 10px 8px;
-      border-bottom: 1px solid #f0f0f0;
-      text-align: left;
-    }
-    tbody tr:hover {
-      background: #f7faff;
-      transition: background 0.16s;
-    }
-    .sortable::after {
-      content: ' ⇅';
-      font-size: 0.95em;
-      color: #88a;
-    }
-    @media (max-width: 700px) {
-      .container { padding: 12px 4px; }
-      th, td { font-size: 0.97em; padding: 8px 2px; }
-      #search { width: 98%; }
-    }
+tbody tr:hover {
+  background: #ecf2fb !important;
+}
+
+.section-header {
+  background: #e8eaf6;
+  font-weight: bold;
+  text-align: center;
+  border-bottom: 2px solid #3f51b5;
+  padding-top: 16px;
+  padding-bottom: 16px;
+}
+
+@media (max-width: 900px) {
+  table { width: 98%; min-width: 600px; }
+  thead th, tbody td { font-size: 0.98em; padding: 12px 6px; }
+  .container { padding: 6px; }
+}
+@media (max-width: 700px) {
+  table { width: 100%; min-width: 420px; }
+  th, td { font-size: 0.95em; padding: 9px 3px; }
+}
