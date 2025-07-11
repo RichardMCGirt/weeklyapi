@@ -1,5 +1,5 @@
 // Airtable Setup
-const AIRTABLE_API_KEY = 'patXTUS9m8os14OO1.6a81b7bc4dd88871072fe71f28b568070cc79035bc988de3d4228d52239c8238'; // <-- Put your Airtable Personal Access Token here
+const AIRTABLE_API_KEY = 'patXTUS9m8os14OO1.6a81b7bc4dd88871072fe71f28b568070cc79035bc988de3d4228d52239c8238'; 
 const AIRTABLE_BASE_ID = 'appX1Saz7wMYh4hhm';
 const AIRTABLE_TABLE_ID = 'tblfCPX293KlcKsdp';
 const AIRTABLE_VIEW = 'viwpf1PbJ7b7KLtjp';
@@ -82,8 +82,7 @@ function isFutureDateHeader(header) {
   }
   return false;
 }
-// TEST MODE: Fake today's date as September 12, 2025
-const MOCK_TODAY = new Date(2025, 6, 15); // Note: months are 0-based (8 = September)
+const MOCK_TODAY = new Date(2025, 6, 14); // Note: months are 0-based (8 = September)
 
 // Fetch Airtable values for a measurable row and an array of date fields
 function isFutureDateHeader(header) {
@@ -119,9 +118,24 @@ async function fetchAllAirtableRecords() {
     if (json.records) allRecords = allRecords.concat(json.records);
     offset = json.offset;
   } while (offset);
-  console.log(`[Airtable] Fetched ${allRecords.length} records`);
-  return allRecords.map(r => r.fields);
+
+  const thisYear = new Date().getFullYear();
+
+  // Filter records by year and Bid Value not empty
+  const filtered = allRecords.filter(rec => {
+    const mod = rec.fields["Last Time Outcome Modified"];
+    const bidValue = rec.fields["Bid $"];
+    if (!mod) return false;
+    const date = new Date(mod);
+    // Bid Value must be defined and not empty string or null
+    const hasBidValue = bidValue !== undefined && bidValue !== null && String(bidValue).trim() !== "";
+    return date.getFullYear() === thisYear && hasBidValue;
+  });
+
+  console.log(`[Airtable] Fetched ${allRecords.length} records, ${filtered.length} for year ${thisYear} with Bid Value`);
+  return filtered.map(r => r.fields);
 }
+
 
 // Returns: { [rowLabel]: { [dateHeader]: sum, ... }, ... }
 async function getEstimatedSumsByTypeAndDate(dateHeaders) {
@@ -135,14 +149,19 @@ async function getEstimatedSumsByTypeAndDate(dateHeaders) {
     let headerDate = new Date(2025, parseInt(mm, 10) - 1, parseInt(dd, 10));
     headerDate.setHours(0,0,0,0);
 
-    for (const rec of records) {
-      if (!rec['Last Time Outcome Modified']) continue;
-      let dateObj = new Date(rec['Last Time Outcome Modified']);
-      dateObj.setHours(0,0,0,0);
+for (const rec of records) {
+  if (!rec['Last Time Outcome Modified']) continue;
+  let dateObj = new Date(rec['Last Time Outcome Modified']);
+  dateObj.setHours(0,0,0,0);
 
-      // Accept if record is in the last 7 days ending on headerDate
-      let diffDays = (headerDate - dateObj) / (1000 * 60 * 60 * 24);
-      if (dateObj > headerDate || diffDays < 0 || diffDays > 6) continue;
+  // Accept if record is in the last 7 days ending on headerDate
+  let diffDays = (headerDate - dateObj) / (1000 * 60 * 60 * 24);
+
+  // LOGGING!
+  if (date === "07/14" && (rec['Bid Value'] || rec['Project Type'])) { // mock for 7/14 header
+    console.log(`[MockDayCheck] Header: ${date} | Record Date: ${dateObj.toLocaleDateString()} | DiffDays: ${diffDays} | ${diffDays >= 0 && diffDays <= 8 ? 'INCLUDED' : 'SKIPPED'}`, rec);
+  }
+if (dateObj > headerDate || diffDays < 0 || diffDays > 8) continue;
 
       // Defensive field extraction
       let projectTypeField = rec['Project Type'];
@@ -320,3 +339,4 @@ window.addEventListener('DOMContentLoaded', function() {
     loadDefaultCSV();
   }
 });
+
