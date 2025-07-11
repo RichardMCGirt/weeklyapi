@@ -83,7 +83,7 @@ function isFutureDateHeader(header) {
   return false;
 }
 // TEST MODE: Fake today's date as September 12, 2025
-const MOCK_TODAY = new Date(2025, 8, 12); // Note: months are 0-based (8 = September)
+const MOCK_TODAY = new Date(2025, 6, 15); // Note: months are 0-based (8 = September)
 
 // Fetch Airtable values for a measurable row and an array of date fields
 function isFutureDateHeader(header) {
