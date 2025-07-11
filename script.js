@@ -105,65 +105,30 @@ function isFutureDateHeader(header) {
   return false;
 }
 
-async function fetchAllAirtableRecords() {
-  let allRecords = [];
-  let offset = "";
-  do {
-    let url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_ID}?view=${AIRTABLE_VIEW}`;
-    if (offset) url += `&offset=${offset}`;
-    const resp = await fetch(url, {
-      headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }
-    });
-    const json = await resp.json();
-    if (json.records) allRecords = allRecords.concat(json.records);
-    offset = json.offset;
-  } while (offset);
-
-  const thisYear = new Date().getFullYear();
-
-  // Filter records by year and Bid Value not empty
-  const filtered = allRecords.filter(rec => {
-    const mod = rec.fields["Last Time Outcome Modified"];
-    const bidValue = rec.fields["Bid $"];
-    if (!mod) return false;
-    const date = new Date(mod);
-    // Bid Value must be defined and not empty string or null
-    const hasBidValue = bidValue !== undefined && bidValue !== null && String(bidValue).trim() !== "";
-    return date.getFullYear() === thisYear && hasBidValue;
-  });
-
-  console.log(`[Airtable] Fetched ${allRecords.length} records, ${filtered.length} for year ${thisYear} with Bid Value`);
-  return filtered.map(r => r.fields);
-}
-
-
 // Returns: { [rowLabel]: { [dateHeader]: sum, ... }, ... }
 async function getEstimatedSumsByTypeAndDate(dateHeaders) {
-  console.log('[Debug] Date Headers:', dateHeaders);
-  const records = await fetchAllAirtableRecords();
+  const records1 = await fetchAllAirtableRecords1(); // Old table
+  const records2 = await fetchAllAirtableRecords2(); // New table
+
   let residentialSums = {}, commercialSums = {};
 
   for (const date of dateHeaders) {
     let sumResidential = 0, sumCommercial = 0;
     let [mm, dd] = date.split('/');
-    let headerDate = new Date(2025, parseInt(mm, 10) - 1, parseInt(dd, 10));
+    let year = new Date().getFullYear();
+    let headerDate = new Date(year, parseInt(mm, 10) - 1, parseInt(dd, 10));
     headerDate.setHours(0,0,0,0);
 
-for (const rec of records) {
-  if (!rec['Last Time Outcome Modified']) continue;
-  let dateObj = new Date(rec['Last Time Outcome Modified']);
-  dateObj.setHours(0,0,0,0);
+    // ------- First Airtable (existing logic) -------
+    for (const rec of records1) {
+      if (!rec['Last Time Outcome Modified']) continue;
+      let dateObj = new Date(rec['Last Time Outcome Modified']);
+      dateObj.setHours(0,0,0,0);
 
-  // Accept if record is in the last 7 days ending on headerDate
-  let diffDays = (headerDate - dateObj) / (1000 * 60 * 60 * 24);
+      let diffDays = (headerDate - dateObj) / (1000 * 60 * 60 * 24);
+      if (dateObj > headerDate || diffDays < 0 || diffDays > 8) continue;
 
-  // LOGGING!
-  if (date === "07/14" && (rec['Bid Value'] || rec['Project Type'])) { // mock for 7/14 header
-    console.log(`[MockDayCheck] Header: ${date} | Record Date: ${dateObj.toLocaleDateString()} | DiffDays: ${diffDays} | ${diffDays >= 0 && diffDays <= 8 ? 'INCLUDED' : 'SKIPPED'}`, rec);
-  }
-if (dateObj > headerDate || diffDays < 0 || diffDays > 8) continue;
-
-      // Defensive field extraction
+      // Defensive extraction
       let projectTypeField = rec['Project Type'];
       let projectType = "";
       if (typeof projectTypeField === 'string') {
@@ -180,19 +145,55 @@ if (dateObj > headerDate || diffDays < 0 || diffDays > 8) continue;
         sumResidential += val;
       }
     }
+
+    // ------- Second Airtable (new logic) -------
+   for (const rec of records2) {
+  if (!rec['Date Marked Completed']) {
+    console.log('[Airtable2][SKIP] Missing Date Marked Completed:', rec);
+    continue;
+  }
+  let dateObj = new Date(rec['Date Marked Completed']);
+  dateObj.setHours(0,0,0,0);
+
+  let diffDays = (headerDate - dateObj) / (1000 * 60 * 60 * 24);
+  if (dateObj > headerDate || diffDays < 0 || diffDays > 8) {
+    console.log(`[Airtable2][SKIP] Out of date range. Header: ${headerDate.toLocaleDateString()}, Record: ${dateObj.toLocaleDateString()}, diffDays: ${diffDays}`, rec);
+    continue;
+  }
+
+  let projectTypeField = rec['Project Type'];
+  let projectType = "";
+  if (typeof projectTypeField === 'string') {
+    projectType = projectTypeField.trim().toLowerCase();
+  } else if (Array.isArray(projectTypeField) && projectTypeField.length > 0) {
+    projectType = String(projectTypeField[0]).trim().toLowerCase();
+  }
+
+  let val = parseFloat(String(rec['Bid Value'] || "0").replace(/[^0-9.\-]/g,""));
+
+  if (projectType === 'commercial') {
+    sumCommercial += val;
+    console.log(`[Airtable2][COMMERCIAL] +$${val} (Total: $${sumCommercial}) for date ${date} | Bid Value: ${rec['Bid Value']}`, rec);
+  } else if (projectType) {
+    sumResidential += val;
+    console.log(`[Airtable2][RESIDENTIAL] +$${val} (Total: $${sumResidential}) for date ${date} | Bid Value: ${rec['Bid Value']}`, rec);
+  } else {
+    console.log(`[Airtable2][SKIP] Unknown Project Type:`, rec);
+  }
+}
+
+console.log(`[Airtable2][RESULTS] For date ${date} => Residential: $${sumResidential}, Commercial: $${sumCommercial}`);
+
+
     residentialSums[date] = sumResidential || "";
     commercialSums[date] = sumCommercial || "";
   }
-
-  console.log('[Debug] Final residential sums:', residentialSums);
-  console.log('[Debug] Final commercial sums:', commercialSums);
 
   return {
     "$ Residential Estimated": residentialSums,
     "$ Commercial Estimated": commercialSums
   };
 }
-
 
 
 async function fetchAirtableRowValues(measurable, dateHeaders) {
@@ -210,6 +211,83 @@ async function fetchAirtableRowValues(measurable, dateHeaders) {
   }
   return values;
 }
+
+// Old source
+async function fetchAllAirtableRecords1() {
+  let allRecords = [];
+  let offset = "";
+  do {
+    let url = `https://api.airtable.com/v0/appX1Saz7wMYh4hhm/tblfCPX293KlcKsdp?view=viwpf1PbJ7b7KLtjp`;
+    if (offset) url += `&offset=${offset}`;
+    const resp = await fetch(url, {
+      headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }
+    });
+    const json = await resp.json();
+    if (json.records) allRecords = allRecords.concat(json.records);
+    offset = json.offset;
+  } while (offset);
+  return allRecords.map(r => r.fields);
+}
+
+// New source
+async function fetchAllAirtableRecords2() {
+  let allRecords = [];
+  let offset = "";
+  let pageCount = 0;
+
+  do {
+    let url = `https://api.airtable.com/v0/appK9gZS77OmsIK50/tblQo2148s04gVPq1?view=viwAI7zWIjUu1d2LT`;
+    if (offset) url += `&offset=${offset}`;
+    pageCount++;
+
+    const resp = await fetch(url, {
+      headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }
+    });
+
+    if (!resp.ok) {
+      console.error(`[Airtable2] Failed to fetch: ${resp.status} ${resp.statusText}`);
+      break;
+    }
+
+    const json = await resp.json();
+
+    if (json.records) {
+      allRecords = allRecords.concat(json.records);
+    } else {
+      console.warn(`[Airtable2] No records found on page ${pageCount}`);
+    }
+
+    offset = json.offset;
+  } while (offset);
+
+  // ----- FILTER SECTION -----
+
+  const filtered = allRecords
+    .map(r => r.fields)
+    .filter(fields => {
+      // Check Bid $ (not undefined, null, or empty string)
+      const bidValue = fields["Bid $"];
+      if (bidValue === undefined || bidValue === null || String(bidValue).trim() === "") {
+        console.log("[Airtable2][FILTER] Skipping: Bid $ empty", fields);
+        return false;
+      }
+    
+    });
+
+  console.log(`[Airtable2] Total records fetched: ${allRecords.length}, filtered: ${filtered.length}`);
+  if (filtered.length > 0) {
+    // Preview first 2 records for debugging
+    console.log('[Airtable2] Example filtered record:', filtered[0]);
+    if (filtered.length > 1) {
+      console.log('[Airtable2] Second filtered record:', filtered[1]);
+    }
+  }
+
+  return filtered;
+}
+
+
+
 
 async function renderTable(data) {
   if (!headers.length) return;
@@ -235,15 +313,21 @@ async function renderTable(data) {
   html += '</tr></thead><tbody>';
 
   data.forEach((row, rIdx) => {
-    let measurable = (measurableColIdx >= 0 ? row[measurableColIdx] : "");
+let measurable = (measurableColIdx >= 0 ? row[measurableColIdx] : "");
+
+// Remap for display/logic
+let measurableKey = measurable;
+if (measurable === "Sales - Residential") measurableKey = "$ Residential Estimated";
+if (measurable === "Sales - Commercial") measurableKey = "$ Commercial Estimated";
     html += `<tr class="${rIdx % 2 === 0 ? 'even' : 'odd'}">`;
     visibleIndexes.forEach(i => {
       let val = row[i];
-    if (
-  (measurable === "$ Residential Estimated" || measurable === "$ Commercial Estimated") &&
+   if (
+  (measurable === "Sales - Residential" || measurable === "Sales - Commercial") &&
   dateHeaders.includes(headers[i])
 ) {
-  let airVal = overrides[measurable][headers[i]] || "";
+  let airVal = overrides[measurableKey][headers[i]] || "";
+
   // Format with $ and commas if a number
   if (airVal !== "" && !isNaN(airVal)) {
     val = "$" + Number(airVal).toLocaleString();
