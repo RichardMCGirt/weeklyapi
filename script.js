@@ -341,10 +341,15 @@ let measurableKey = measurable;
     visibleIndexes.forEach(i => {
       let val = row[i];
    if (
-  (measurable === "Sales - Residential" || measurable === "Sales - Commercial") &&
+  (
+    measurable === "Sales - Residential" ||
+    measurable === "Sales - Commercial" ||
+    measurable === "$ Residential Estimated" ||
+    measurable === "$ Commercial Estimated"
+  ) &&
   dateHeaders.includes(headers[i])
 ) {
-  let airVal = overrides[measurableKey][headers[i]] || "";
+  let airVal = overrides[measurable][headers[i]] || "";
 
   // Format with $ and commas if a number
   if (airVal !== "" && !isNaN(airVal)) {
@@ -353,6 +358,7 @@ let measurableKey = measurable;
     val = airVal;
   }
 }
+
 
       if (val === "Omnna" || val === "Airtable" || val === "Mgmt") val = "";
       html += `<td>${val ?? ""}</td>`;
