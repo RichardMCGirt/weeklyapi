@@ -304,10 +304,6 @@ async function fetchAllAirtableRecords2() {
   return result;
 }
 
-
-
-
-
 async function renderTable(data) {
   if (!headers.length) return;
 
@@ -317,6 +313,7 @@ async function renderTable(data) {
   });
 
   const measurableColIdx = headers.findIndex(h => h.trim() === "Measurable");
+  const goalColIdx = headers.findIndex(h => h.trim().toLowerCase() === "goal");
   const dateHeaders = visibleIndexes.map(i => headers[i])
     .filter(h => /^\d{2}\/\d{2}(\/\d{4})?$/.test(h));
 
@@ -332,63 +329,71 @@ async function renderTable(data) {
   html += '</tr></thead><tbody>';
 
   data.forEach((row, rIdx) => {
-let measurable = (measurableColIdx >= 0 ? row[measurableColIdx] : "");
-
-// Remap for display/logic
-let measurableKey = measurable;
+    let measurable = (measurableColIdx >= 0 ? row[measurableColIdx] : "");
+    let goalValue = goalColIdx >= 0 ? row[goalColIdx] : "";
 
     html += `<tr class="${rIdx % 2 === 0 ? 'even' : 'odd'}">`;
     visibleIndexes.forEach(i => {
+      let colHeader = headers[i];
       let val = row[i];
-   if (
-  (
-    measurable === "Sales - Residential" ||
-    measurable === "Sales - Commercial" ||
-    measurable === "$ Residential Estimated" ||
-    measurable === "$ Commercial Estimated"
-  ) &&
-  dateHeaders.includes(headers[i])
-) {
-  let airVal = overrides[measurable][headers[i]] || "";
 
-  // Format with $ and commas if a number
-  if (airVal !== "" && !isNaN(airVal)) {
-    val = "$" + Number(airVal).toLocaleString();
-  } else {
-    val = airVal;
-  }
+      // Show override values for these rows (from Airtable)
+      if (
+        (
+          measurable === "Sales - Residential" ||
+          measurable === "Sales - Commercial" ||
+          measurable === "$ Residential Estimated" ||
+          measurable === "$ Commercial Estimated"
+        ) &&
+        dateHeaders.includes(colHeader)
+      ) {
+        let airVal = overrides[measurable][colHeader] || "";
+        if (airVal !== "" && !isNaN(airVal)) {
+          val = "$" + Number(airVal).toLocaleString();
+        } else {
+          val = airVal;
+        }
+      }
+
+      // Hide specific text values
+      if (val === "Omnna" || val === "Airtable" || val === "Mgmt") val = "";
+
+      // --- DELTA logic: Show difference from Goal under value ---
+      let cellHtml = `${val ?? ""}`;
+      if (
+        dateHeaders.includes(colHeader) &&
+        measurable !== "Weeks Remaining FY" &&
+        !/Weeks Remaining FY/i.test(measurable) &&
+        !isNaN(parseFloat(val.toString().replace(/[^0-9.\-]/g, ""))) &&
+        goalValue &&
+        !isNaN(parseFloat(goalValue.toString().replace(/[^0-9.\-]/g, "")))
+      ) {
+        // Parse both as numbers
+        let v = parseFloat(val.toString().replace(/[^0-9.\-]/g, ""));
+        let g = parseFloat(goalValue.toString().replace(/[^0-9.\-]/g, ""));
+        let delta = v - g;
+        let deltaClass = delta > 0 ? "delta-positive" : delta < 0 ? "delta-negative" : "";
+let sign = delta > 0 ? "+" : "";
+let symbol = delta > 0 ? "Δ" : "∇";
+// Only show if not zero
+if (!isNaN(delta) && delta !== 0) {
+  cellHtml += `<div class="delta ${deltaClass}">${symbol} ${sign}$${Math.abs(delta).toLocaleString()}</div>`;
 }
 
+      }
 
-      if (val === "Omnna" || val === "Airtable" || val === "Mgmt") val = "";
-      html += `<td>${val ?? ""}</td>`;
+      html += `<td>${cellHtml}</td>`;
     });
     html += '</tr>';
   });
+
   html += '</tbody></table>';
   document.getElementById('table-container').innerHTML = html;
 }
 
-// Save/load from localStorage (optional)
-function saveToLocalStorage() {
-  const obj = { headers, globalData };
-  localStorage.setItem("weeklyGoalsTable", JSON.stringify(obj));
-}
-function loadFromLocalStorage() {
-  const saved = localStorage.getItem("weeklyGoalsTable");
-  if (saved) {
-    try {
-      const obj = JSON.parse(saved);
-      if (Array.isArray(obj.headers) && Array.isArray(obj.globalData)) {
-        headers = obj.headers;
-        globalData = obj.globalData;
-        renderTable(globalData);
-        return true;
-      }
-    } catch (e) {}
-  }
-  return false;
-}
+
+
+
 
 // CSV loader from file upload
 document.getElementById('csvFile').addEventListener('change', function(e) {
@@ -409,7 +414,6 @@ document.getElementById('csvFile').addEventListener('change', function(e) {
       return newRow;
     });
     await renderTable(globalData); // <-- use await for async render
-    saveToLocalStorage();
   };
   reader.readAsText(file);
 });
@@ -434,7 +438,6 @@ async function loadDefaultCSV() {
         return newRow;
       });
       await renderTable(globalData); // <-- use await for async render
-      saveToLocalStorage();
     })
     .catch(() => {
       document.getElementById('table-container').innerHTML = "<p>No data found. Please upload a CSV file.</p>";
@@ -443,8 +446,6 @@ async function loadDefaultCSV() {
 
 // On page load: try localStorage, else fetch WeeklyGoals.csv
 window.addEventListener('DOMContentLoaded', function() {
-  if (!loadFromLocalStorage()) {
     loadDefaultCSV();
-  }
 });
 

@@ -101,3 +101,15 @@ tbody tr:hover {
   table { width: 100%; min-width: 420px; }
   th, td { font-size: 0.95em; padding: 9px 3px; }
 }
+.delta {
+  font-size: 0.95em;
+  margin-top: 2px;
+}
+.delta-positive {
+  color: #1db800; /* Green */
+  font-weight: bold;
+}
+.delta-negative {
+  color: #c70d24; /* Red */
+  font-weight: bold;
+}
