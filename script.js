@@ -307,17 +307,22 @@ async function fetchAllAirtableRecords2() {
 async function renderTable(data) {
   if (!headers.length) return;
 
+  // Find visible columns
   let visibleIndexes = [];
   headers.forEach((header, idx) => {
     if (!isFutureDateHeader(header)) visibleIndexes.push(idx);
   });
 
+  // Column indexes
   const measurableColIdx = headers.findIndex(h => h.trim() === "Measurable");
   const goalColIdx = headers.findIndex(h => h.trim().toLowerCase() === "goal");
   const dateHeaders = visibleIndexes.map(i => headers[i])
     .filter(h => /^\d{2}\/\d{2}(\/\d{4})?$/.test(h));
 
   const overrides = await getEstimatedSumsByTypeAndDate(dateHeaders);
+
+  // Section labels for row-only display
+  const sectionLabels = ["PreCon", "Estimating", "Administration", "Field"];
 
   let html = '<table><thead>';
   html += buildSectionHeaderRow(visibleIndexes.map(i => headers[i]));
@@ -332,6 +337,21 @@ async function renderTable(data) {
     let measurable = (measurableColIdx >= 0 ? row[measurableColIdx] : "");
     let goalValue = goalColIdx >= 0 ? row[goalColIdx] : "";
 
+    // SECTION LABEL ROW: Only in Measurable column, rest blank
+    if (sectionLabels.includes(measurable)) {
+      html += `<tr class="${rIdx % 2 === 0 ? 'even' : 'odd'} section-row">`;
+      visibleIndexes.forEach((_, idx) => {
+        if (idx === measurableColIdx) {
+          html += `<td colspan="1" style="font-weight:bold;">${measurable}</td>`;
+        } else {
+          html += `<td></td>`;
+        }
+      });
+      html += '</tr>';
+      return;
+    }
+
+    // Normal data row
     html += `<tr class="${rIdx % 2 === 0 ? 'even' : 'odd'}">`;
     visibleIndexes.forEach(i => {
       let colHeader = headers[i];
@@ -373,13 +393,12 @@ async function renderTable(data) {
         let g = parseFloat(goalValue.toString().replace(/[^0-9.\-]/g, ""));
         let delta = v - g;
         let deltaClass = delta > 0 ? "delta-positive" : delta < 0 ? "delta-negative" : "";
-let sign = delta > 0 ? "+" : "";
-let symbol = delta > 0 ? "Δ" : "∇";
-// Only show if not zero
-if (!isNaN(delta) && delta !== 0) {
-  cellHtml += `<div class="delta ${deltaClass}">${symbol} ${sign}$${Math.abs(delta).toLocaleString()}</div>`;
-}
-
+        let sign = delta > 0 ? "+" : "";
+        let symbol = delta > 0 ? "Δ" : "∇"; // Δ for positive, ∇ for negative
+        // Only show if not zero
+        if (!isNaN(delta) && delta !== 0) {
+          cellHtml += `<div class="delta ${deltaClass}">${symbol} ${sign}$${Math.abs(delta).toLocaleString()}</div>`;
+        }
       }
 
       html += `<td>${cellHtml}</td>`;
@@ -390,6 +409,7 @@ if (!isNaN(delta) && delta !== 0) {
   html += '</tbody></table>';
   document.getElementById('table-container').innerHTML = html;
 }
+
 
 
 

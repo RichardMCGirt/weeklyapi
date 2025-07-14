@@ -113,3 +113,7 @@ tbody tr:hover {
   color: #c70d24; /* Red */
   font-weight: bold;
 }
+#table-container table th:first-child,
+#table-container table td:first-child {
+  display: none;
+}
