@@ -63,25 +63,7 @@ function buildSectionHeaderRow(headers) {
   return rowHtml;
 }
 
-// Hide future date columns (MM/DD or MM/DD/YYYY)
-function isFutureDateHeader(header) {
-  const today = new Date();
-  // MM/DD
-  let match = /^(\d{2})\/(\d{2})$/.exec(header);
-  if (match) {
-    let year = today.getFullYear();
-    let date = new Date(year, parseInt(match[1],10)-1, parseInt(match[2],10));
-    if (date < today.setHours(0,0,0,0)) return false;
-    return date > new Date(today.setHours(0,0,0,0));
-  }
-  // MM/DD/YYYY
-  match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(header);
-  if (match) {
-    let date = new Date(match[3], parseInt(match[1],10)-1, parseInt(match[2],10));
-    return date > new Date(today.setHours(0,0,0,0));
-  }
-  return false;
-}
+
 const MOCK_TODAY = new Date(2025, 6, 21); // Note: months are 0-based (8 = September)
 
 // Fetch Airtable values for a measurable row and an array of date fields
@@ -108,7 +90,7 @@ function isFutureDateHeader(header) {
 // Returns: { [rowLabel]: { [dateHeader]: sum, ... }, ... }
 async function getEstimatedSumsByTypeAndDate(dateHeaders) {
   const records1 = await fetchAllAirtableRecords1(); // Old table
-  const records2 = await fetchAllAirtableRecords2(); // New table
+ const records2 = await fetchAllAirtableRecords2(); // New table
 
   // Define these ONCE at the top:
   let residentialSums1 = {}, commercialSums1 = {};
@@ -357,23 +339,26 @@ async function renderTable(data) {
       let colHeader = headers[i];
       let val = row[i];
 
-      // Show override values for these rows (from Airtable)
-      if (
-        (
-          measurable === "Sales - Residential" ||
-          measurable === "Sales - Commercial" ||
-          measurable === "$ Residential Estimated" ||
-          measurable === "$ Commercial Estimated"
-        ) &&
-        dateHeaders.includes(colHeader)
-      ) {
-        let airVal = overrides[measurable][colHeader] || "";
-        if (airVal !== "" && !isNaN(airVal)) {
-          val = "$" + Number(airVal).toLocaleString();
-        } else {
-          val = airVal;
-        }
-      }
+     // Show override values for these rows (from Airtable)
+//if (
+  //(
+    //measurable === "Sales - Residential" ||
+    //measurable === "Sales - Commercial" ||
+   // measurable === "$ Residential Estimated" ||
+   // measurable === "$ Commercial Estimated"
+  //) &&
+ // dateHeaders.includes(colHeader) &&
+ // overrides &&
+ // overrides[measurable] &&
+ // overrides[measurable][colHeader] !== undefined
+//) {
+ // let airVal = overrides[measurable][colHeader] || "";
+  //if (airVal !== "" && !isNaN(airVal)) {
+   // val = "$" + Number(airVal).toLocaleString();
+  //} else {
+    //val = airVal;
+  //}
+//}
 
       // Hide specific text values
       if (val === "Omnna" || val === "Airtable" || val === "Mgmt") val = "";
@@ -410,11 +395,6 @@ async function renderTable(data) {
   document.getElementById('table-container').innerHTML = html;
 }
 
-
-
-
-
-
 // CSV loader from file upload
 document.getElementById('csvFile').addEventListener('change', function(e) {
   const file = this.files[0];
@@ -438,31 +418,75 @@ document.getElementById('csvFile').addEventListener('change', function(e) {
   reader.readAsText(file);
 });
 
+async function fetchCSVFromAirtable() {
+  // Airtable info - edit if your field name for the CSV attachment is not "CSV file"
+  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_ID}?view=${AIRTABLE_VIEW}`;
+  const resp = await fetch(url, {
+    headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }
+  });
+  const json = await resp.json();
+  if (!json.records || !json.records.length) throw new Error('No records found in Airtable.');
+
+  // Find the first record with a CSV attachment in "CSV file" field
+  for (let rec of json.records) {
+    const files = rec.fields['CSV file'];
+    if (files && files.length && files[0].url) {
+      // Fetch the CSV content
+      const fileResp = await fetch(files[0].url);
+      if (!fileResp.ok) throw new Error('Could not fetch CSV attachment from Airtable.');
+      return await fileResp.text();
+    }
+  }
+  throw new Error('No CSV attachment found in Airtable.');
+}
+
+
 // CSV loader from /WeeklyGoals.csv if available
 async function loadDefaultCSV() {
-  fetch('WeeklyGoals.csv')
-    .then(async resp => {
-      if (!resp.ok) throw new Error('Not found');
-      return resp.text();
-    })
-    .then(async csv => {
-      let arr = parseCSV(csv);
-      if (arr.length < 2) {
-        document.getElementById('table-container').innerHTML = "<p>No data found in WeeklyGoals.csv.</p>";
-        return;
-      }
-      headers = extraCols.concat(arr[0].slice());
-      globalData = arr.slice(1).map(row => {
-        let newRow = row.slice();
-        while (newRow.length < headers.length) newRow.push("");
-        return newRow;
-      });
-      await renderTable(globalData); // <-- use await for async render
-    })
-    .catch(() => {
-      document.getElementById('table-container').innerHTML = "<p>No data found. Please upload a CSV file.</p>";
+  try {
+    // Try fetching from Airtable attachment
+    const csv = await fetchCSVFromAirtable();
+    let arr = parseCSV(csv);
+    if (arr.length < 2) {
+      document.getElementById('table-container').innerHTML = "<p>No data found in Airtable CSV.</p>";
+      return;
+    }
+    headers = extraCols.concat(arr[0].slice());
+    globalData = arr.slice(1).map(row => {
+      let newRow = row.slice();
+      while (newRow.length < headers.length) newRow.push("");
+      return newRow;
     });
+    await renderTable(globalData);
+    return;
+  } catch (e) {
+    console.warn('[CSV Loader] Airtable fetch failed, falling back to local CSV.', e);
+    // Try local fallback
+    fetch('WeeklyGoals.csv')
+      .then(async resp => {
+        if (!resp.ok) throw new Error('Not found');
+        return resp.text();
+      })
+      .then(async csv => {
+        let arr = parseCSV(csv);
+        if (arr.length < 2) {
+          document.getElementById('table-container').innerHTML = "<p>No data found in WeeklyGoals.csv.</p>";
+          return;
+        }
+        headers = extraCols.concat(arr[0].slice());
+        globalData = arr.slice(1).map(row => {
+          let newRow = row.slice();
+          while (newRow.length < headers.length) newRow.push("");
+          return newRow;
+        });
+        await renderTable(globalData); // <-- use await for async render
+      })
+      .catch(() => {
+        document.getElementById('table-container').innerHTML = "<p>No data found. Please upload a CSV file.</p>";
+      });
+  }
 }
+
 
 // On page load: try localStorage, else fetch WeeklyGoals.csv
 window.addEventListener('DOMContentLoaded', function() {
